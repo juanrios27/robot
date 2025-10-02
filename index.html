@@ -280,7 +280,7 @@
         let animationPhase = 0;
         let phaseStartTime = Date.now();
         
-        const phaseDurations = [1500, 1800, 1000, 1200, 2200, 1600, 1000, 1500];
+        const phaseDurations = [100, 1800, 1200, 1200, 2200, 1600, 1000, 1500];
         
         function smoothAngle(current, target, speed) {
             const diff = target - current;
@@ -345,25 +345,44 @@
                 }
             });
             
-            // Control de fases - esperar hasta case 2 para recoger
+            // Control de fases - esperar hasta que la caja esté en posición
             const phaseElapsed = now - phaseStartTime;
-            if (phaseElapsed >= phaseDurations[animationPhase]) {
-                // Solo avanzar a la siguiente fase si hay pieza disponible o ya está en proceso
-                if (animationPhase === 0 || animationPhase === 1) {
-                    // Verificar si hay pieza en posición correcta
-                    let pieceReady = false;
-                    for (let p of pieces) {
-                        if (p.state === 'onConveyor' && p.mesh.position.x >= -9 && p.mesh.position.x <= -7.5) {
-                            pieceReady = true;
-                            break;
-                        }
-                    }
-                    
-                    if (!pieceReady && animationPhase === 1) {
-                        return;
-                    }
+            
+            // Verificar si hay pieza en la zona de recogida
+            let pieceInPickupZone = false;
+            let targetPiece = null;
+            for (let p of pieces) {
+                if (p.state === 'onConveyor' && p.mesh.position.x >= -8.5 && p.mesh.position.x <= -7.8) {
+                    pieceInPickupZone = true;
+                    targetPiece = p;
+                    break;
                 }
-                
+            }
+            
+            // Lógica de avance de fases
+            let canAdvance = false;
+            
+            if (animationPhase === 0) {
+                // Case 0: Esperar muy poco tiempo, solo para detectar la pieza
+                canAdvance = phaseElapsed >= phaseDurations[0];
+                if (canAdvance && !pieceInGripper && targetPiece) {
+                    pieceInGripper = targetPiece;
+                }
+            } else if (animationPhase === 1) {
+                // Case 1: Esperar a que la pieza llegue a la zona de recogida
+                if (pieceInPickupZone && pieceInGripper) {
+                    canAdvance = phaseElapsed >= phaseDurations[1];
+                } else if (!pieceInGripper && targetPiece) {
+                    // Si detectamos una pieza nueva, asignarla
+                    pieceInGripper = targetPiece;
+                }
+                // Si no hay pieza en zona, esperamos indefinidamente
+            } else {
+                // Resto de fases: avanzar normalmente
+                canAdvance = phaseElapsed >= phaseDurations[animationPhase];
+            }
+            
+            if (canAdvance) {
                 animationPhase = (animationPhase + 1) % 8;
                 phaseStartTime = now;
                 
@@ -384,25 +403,17 @@
             let targetBase = 0, targetShoulder = 0, targetElbow = 0;
             
             switch(animationPhase) {
-                case 0:
+                case 0: // Posición inicial - espera muy breve
                     targetBase = 0;
                     targetShoulder = 0;
                     targetElbow = 0;
-                    if (!pieceInGripper) {
-                        for (let p of pieces) {
-                            if (p.state === 'onConveyor' && p.mesh.position.x >= -9 && p.mesh.position.x <= -7.5) {
-                                pieceInGripper = p;
-                                break;
-                            }
-                        }
-                    }
                     break;
-                case 1:
+                case 1: // Aproximarse - SE QUEDA AQUÍ hasta que la caja llegue
                     targetBase = -55;
                     targetShoulder = 0;
                     targetElbow = 0;
                     break;
-                case 2:
+                case 2: // Recoger - LA CAJA YA ESTÁ EN POSICIÓN
                     targetBase = 130;
                     targetShoulder = 0;
                     targetElbow = 0;
