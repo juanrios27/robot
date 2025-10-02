@@ -161,8 +161,7 @@
                 },
                 function(error) {
                     console.error('❌ Error al cargar el modelo GLB:', error);
-                    console.log('🔄 Usando robot placeholder como respaldo');
-                    createPlaceholderRobot();
+                    console.log('⚠️ Verifica que la URL sea correcta y el archivo sea accesible');
                 }
             );
         }
@@ -427,12 +426,19 @@
             shoulderAngle = smoothAngle(shoulderAngle, targetShoulder, 0.09);
             elbowAngle = smoothAngle(elbowAngle, targetElbow, 0.09);
             
-            baseRotation.rotation.y = THREE.MathUtils.degToRad(baseAngle);
-            link1Group.rotation.z = THREE.MathUtils.degToRad(shoulderAngle);
-            link2Group.rotation.z = THREE.MathUtils.degToRad(elbowAngle);
+            // Aplicar rotaciones solo si los grupos existen
+            if (baseRotation && baseRotation.rotation) {
+                baseRotation.rotation.y = THREE.MathUtils.degToRad(baseAngle);
+            }
+            if (link1Group && link1Group.rotation) {
+                link1Group.rotation.z = THREE.MathUtils.degToRad(shoulderAngle);
+            }
+            if (link2Group && link2Group.rotation) {
+                link2Group.rotation.z = THREE.MathUtils.degToRad(elbowAngle);
+            }
             
             // Actualizar posición de pieza en gripper
-            if (pieceInGripper && pieceInGripper.state === 'picked') {
+            if (pieceInGripper && pieceInGripper.state === 'picked' && gripperBase && gripperBase.getWorldPosition) {
                 const gripperPos = new THREE.Vector3();
                 gripperBase.getWorldPosition(gripperPos);
                 pieceInGripper.mesh.position.copy(gripperPos);
