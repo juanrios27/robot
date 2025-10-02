@@ -323,15 +323,15 @@
         
         // SECUENCIA DE MOVIMIENTOS (se ajusta para cada línea con su Z)
         const movementSequence = [
-            { x: -4, y: 1, z: 0, duration: 1000, baseAngle: 130, shoulderAngle: 0, elbowAngle: 0 },
-            { x: -3, y: 1, z: -2.65, duration: 1000, baseAngle: 95, shoulderAngle: 0, elbowAngle: 0 },
-            { x: -2, y: 1, z: -3.46, duration: 1000, baseAngle: 75, shoulderAngle: 0, elbowAngle: 0 },
-            { x: -1, y: 1, z: -3.87, duration: 1200, baseAngle: 55, shoulderAngle: 0, elbowAngle: 0 },
-            { x: 0, y: 1, z: -4, duration: 1200, baseAngle: 40, shoulderAngle: 0, elbowAngle: 0 },
-            { x: 1, y: 1, z: -3.87, duration: 1000, baseAngle: 25, shoulderAngle: 0, elbowAngle: 0 },
-            { x: 2, y: 1, z: -3.46, duration: 1000, baseAngle: 0, shoulderAngle: 0, elbowAngle: 0 },
-            { x: 3, y: 1, z: -2.65, duration: 1000, baseAngle: -20.5, shoulderAngle: 0, elbowAngle: 0 },
-            { x: 4, y: 1, z: 0, duration: 1200, baseAngle: -50, shoulderAngle: 0, elbowAngle: 0 }
+            { x: -4, y: 1, z: 0, duration: 1000, baseAngle: 0, shoulderAngle: 130, elbowAngle: 130 },
+            { x: -3, y: 1, z: -2.65, duration: 1000, baseAngle: 0, shoulderAngle: 130, elbowAngle: 93 },
+            { x: -2, y: 1, z: -3.46, duration: 1000, baseAngle: 0, shoulderAngle: 130, elbowAngle: 73 },
+            { x: -1, y: 1, z: -3.87, duration: 1200, baseAngle: 0, shoulderAngle: 130, elbowAngle: 55 },
+            { x: 0, y: 1, z: -4, duration: 1200, baseAngle: 0, shoulderAngle: 130, elbowAngle: 40 },
+            { x: 1, y: 1, z: -3.87, duration: 1000, baseAngle: 0, shoulderAngle: 130, elbowAngle: 25 },
+            { x: 2, y: 1, z: -3.46, duration: 1000, baseAngle: 0, shoulderAngle: 130, elbowAngle: 8 },
+            { x: 3, y: 1, z: -2.65, duration: 1000, baseAngle: 0, shoulderAngle: 130, elbowAngle: -11.5 },
+            { x: 4, y: 1, z: 0, duration: 1200, baseAngle: 0, shoulderAngle: 130, elbowAngle: -50 }
         ];
         
         // FUNCIÓN PARA CREAR PIEZA EN UNA LÍNEA ESPECÍFICA
@@ -549,9 +549,9 @@
                 
                 // FASE 3: Desaparecer y reiniciar
                 else if (robot.animationPhase === 3) {
-                    robot.targetBaseAngle = 130;
-                    robot.targetShoulderAngle = 0;
-                    robot.targetElbowAngle = 0;
+                    robot.targetBaseAngle = 0;
+                    robot.targetShoulderAngle = 130;
+                    robot.targetElbowAngle = -50;
                     
                     if (now >= robot.disappearTime && robot.pieceInGripper) {
                         scene.remove(robot.pieceInGripper.mesh);
