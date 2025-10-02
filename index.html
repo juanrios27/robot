@@ -423,10 +423,11 @@
                     };
                     sequenceInitialized = true;
                     console.log('🎯 Secuencia iniciada desde posición:', movementStartPos);
+                    console.log('🎯 Caja en gripper existe:', !!pieceInGripper);
                 }
                 
                 // Ejecutar movimientos
-                if (pieceInGripper && sequenceInitialized) {
+                if (pieceInGripper && sequenceInitialized && pieceInGripper.state === 'picked') {
                     const timeInMovement = now - movementStartTime;
                     const currentMove = movementSequence[currentMovementIndex];
                     
@@ -438,15 +439,14 @@
                             ? 2 * progress * progress 
                             : 1 - Math.pow(-2 * progress + 2, 2) / 2;
                         
-                        pieceInGripper.mesh.position.x = movementStartPos.x + (currentMove.x - movementStartPos.x) * easeProgress;
-                        pieceInGripper.mesh.position.y = movementStartPos.y + (currentMove.y - movementStartPos.y) * easeProgress;
-                        pieceInGripper.mesh.position.z = movementStartPos.z + (currentMove.z - movementStartPos.z) * easeProgress;
+                        const newX = movementStartPos.x + (currentMove.x - movementStartPos.x) * easeProgress;
+                        const newY = movementStartPos.y + (currentMove.y - movementStartPos.y) * easeProgress;
+                        const newZ = movementStartPos.z + (currentMove.z - movementStartPos.z) * easeProgress;
+                        
+                        pieceInGripper.mesh.position.set(newX, newY, newZ);
                         pieceInGripper.mesh.rotation.y += 0.02;
                         
-                        // Log cada 10% de progreso
-                        if (Math.floor(progress * 10) !== Math.floor((progress - 0.01) * 10)) {
-                            console.log(`📍 Punto ${currentMovementIndex + 1}/4 - Progreso: ${(progress * 100).toFixed(0)}%`);
-                        }
+                        console.log(`📍 Punto ${currentMovementIndex + 1}/4 - Progreso: ${(progress * 100).toFixed(0)}% - Pos: (${newX.toFixed(1)}, ${newY.toFixed(1)}, ${newZ.toFixed(1)})`);
                         
                         // Pasar al siguiente punto
                         if (progress >= 1) {
@@ -466,7 +466,12 @@
                                 disappearTime = now + 1000;
                             }
                         }
+                    } else {
+                        console.log('❌ currentMove no existe');
                     }
+                } else {
+                    if (!pieceInGripper) console.log('❌ No hay pieza en gripper');
+                    if (!sequenceInitialized) console.log('❌ Secuencia no inicializada');
                 }
             }
             
