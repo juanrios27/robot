@@ -95,7 +95,7 @@
         // 4. Ajusta la escala si es necesario (scale: 1 = tamaño original)
         
         const ROBOT_CONFIG = {
-            url: 'https://github.com/juanrios27/robot/blob/main/Ensamble_Completo_de_dise%C3%B1o.glb',
+            url: 'https://raw.githubusercontent.com/juanrios27/robot/main/Ensamble_Completo_de_dise%C3%B1o.glb',
             scale: 0.01,             // Escala del modelo (ajustar según necesidad)
             position: { x: 0, y: 0, z: 0 },
             rotation: { x: 0, y: 0, z: 0 }
@@ -107,7 +107,7 @@
         
         // Cargar modelo GLB desde URL
         function loadRobotGLB() {
-            if (ROBOT_CONFIG.url === 'https://github.com/juanrios27/robot/blob/main/Ensamble_Completo_de_dise%C3%B1o.glb') {
+            if (ROBOT_CONFIG.url === 'https://raw.githubusercontent.com/juanrios27/robot/main/Ensamble_Completo_de_dise%C3%B1o.glb') {
                 console.warn('⚠️ No se ha configurado la URL del modelo GLB. Usando robot placeholder.');
                 createPlaceholderRobot();
                 return;
