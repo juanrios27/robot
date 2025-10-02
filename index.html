@@ -259,6 +259,7 @@
             piece.position.set(-15, 1, 0);
             piece.castShadow = true;
             piece.receiveShadow = true;
+            piece.visible = true; // Asegurar que inicia visible
             scene.add(piece);
             pieces.push({
                 mesh: piece,
@@ -338,9 +339,6 @@
                 if (p.state === 'onConveyor') {
                     p.mesh.position.x += 0.035;
                     p.mesh.rotation.y += 0.02;
-                } else if (p.state === 'released') {
-                    // Las liberadas se mueven un poco
-                    p.mesh.position.x += 0.05;
                 }
             });
             
@@ -391,6 +389,7 @@
                                     pieceInGripper = p;
                                     pieceInGripper.state = 'picked';
                                     pieceInGripper.pickedUp = true;
+                                    pieceInGripper.mesh.visible = true; // Asegurar visibilidad
                                     console.log('✅ Caja agarrada!');
                                     break;
                                 }
@@ -403,12 +402,12 @@
                     targetShoulder = 0;
                     targetElbow = 0;
                     
-                    // Soltar la caja
+                    // Soltar la caja - la devolvemos a la banda
                     if (pieceInGripper) {
-                        pieceInGripper.state = 'released';
-                        pieceInGripper.timeReleased = now;
+                        pieceInGripper.state = 'onConveyor';
+                        pieceInGripper.mesh.position.y = 1; // Altura de la banda
                         pieceInGripper = null;
-                        console.log('📦 Caja liberada!');
+                        console.log('📦 Caja devuelta a la banda!');
                     }
                     break;
             }
@@ -434,25 +433,14 @@
                 gripperBase.getWorldPosition(gripperPos);
                 pieceInGripper.mesh.position.copy(gripperPos);
                 pieceInGripper.mesh.position.y -= 1.2;
+                pieceInGripper.mesh.visible = true; // Mantener visible
+                pieceInGripper.mesh.rotation.y += 0.02; // Mantener rotación
             }
             
-            // Manejar cajas liberadas - desaparecen después de 500ms
-            pieces.forEach(p => {
-                if (p.state === 'released' && p.timeReleased > 0) {
-                    if (now - p.timeReleased > 500) {
-                        scene.remove(p.mesh);
-                        p.state = 'deleted';
-                    }
-                }
-            });
-            
-            // Limpiar piezas
+            // Limpiar piezas que salen de la escena
             for (let i = pieces.length - 1; i >= 0; i--) {
                 if (pieces[i].mesh.position.x > 20 && pieces[i].state === 'onConveyor') {
                     scene.remove(pieces[i].mesh);
-                    pieces.splice(i, 1);
-                }
-                if (pieces[i].state === 'deleted') {
                     pieces.splice(i, 1);
                 }
             }
