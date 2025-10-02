@@ -348,56 +348,18 @@
             // Control de fases - esperar hasta que la caja esté en posición
             const phaseElapsed = now - phaseStartTime;
             
-            // Verificar si hay pieza en la zona de recogida
-            let pieceInPickupZone = false;
-            let targetPiece = null;
-            for (let p of pieces) {
-                if (p.state === 'onConveyor' && p.mesh.position.x >= -9.5 && p.mesh.position.x <= -7.0) {
-                    pieceInPickupZone = true;
-                    targetPiece = p;
-                    break;
-                }
-            }
-            
-            // Lógica de avance de fases
-            let canAdvance = false;
-            
-            if (animationPhase === 0) {
-                // Case 0: Esperar muy poco tiempo, solo para detectar la pieza
-                canAdvance = phaseElapsed >= phaseDurations[0];
-                if (canAdvance && !pieceInGripper && targetPiece) {
-                    pieceInGripper = targetPiece;
-                    pieceInGripper.state = 'waiting'; // Cambiar estado para que deje de moverse
-                }
-            } else if (animationPhase === 1) {
-                // Case 1: Esperar a que la pieza llegue a la zona de recogida
-                if (pieceInPickupZone && pieceInGripper) {
-                    canAdvance = phaseElapsed >= phaseDurations[1];
-                } else if (!pieceInGripper && targetPiece) {
-                    // Si detectamos una pieza nueva, asignarla
-                    pieceInGripper = targetPiece;
-                    pieceInGripper.state = 'waiting'; // Cambiar estado para que deje de moverse
-                }
-                // Si no hay pieza en zona, esperamos indefinidamente
-            } else {
-                // Resto de fases: avanzar normalmente
-                canAdvance = phaseElapsed >= phaseDurations[animationPhase];
-            }
-            
-            if (canAdvance) {
+            // Control de fases simple - avanzar según tiempo
+            const phaseElapsed = now - phaseStartTime;
+            if (phaseElapsed >= phaseDurations[animationPhase]) {
                 animationPhase = (animationPhase + 1) % 8;
                 phaseStartTime = now;
                 
-                // Al completar el ciclo, eliminar pieza y preparar para crear nueva
-                if (animationPhase === 0 && pieceInGripper) {
-                    if (pieceInGripper.state === 'delivered') {
-                        scene.remove(pieceInGripper.mesh);
-                        const idx = pieces.indexOf(pieceInGripper);
-                        if (idx > -1) pieces.splice(idx, 1);
-                        
-                        singlePieceCreated = false;
+                // Al completar el ciclo, soltar la pieza
+                if (animationPhase === 0) {
+                    if (pieceInGripper) {
+                        pieceInGripper = null;
                     }
-                    pieceInGripper = null;
+                    singlePieceCreated = false;
                 }
             }
             
@@ -405,23 +367,46 @@
             let targetBase = 0, targetShoulder = 0, targetElbow = 0;
             
             switch(animationPhase) {
-                case 0: // Posición inicial - espera muy breve
+                case 0: // Posición inicial
                     targetBase = 0;
                     targetShoulder = 0;
                     targetElbow = 0;
                     break;
-                case 1: // Aproximarse - SE QUEDA AQUÍ hasta que la caja llegue
+                case 1: // Aproximarse
                     targetBase = -55;
                     targetShoulder = 0;
                     targetElbow = 0;
                     break;
-                case 2: // Recoger - LA CAJA YA ESTÁ EN POSICIÓN
+                case 2: // Recoger - detectar colisión con caja
                     targetBase = 130;
                     targetShoulder = 0;
                     targetElbow = 0;
-                    if (pieceInGripper && !pieceInGripper.pickedUp) {
-                        pieceInGripper.state = 'picked';
-                        pieceInGripper.pickedUp = true;
+                    // Detectar colisión con la caja
+                    if (!pieceInGripper && gripperBase && gripperBase.getWorldPosition) {
+                        const gripperPos = new THREE.Vector3();
+                        gripperBase.getWorldPosition(gripperPos);
+                        
+                        for (let p of pieces) {
+                            if (p.state === 'onConveyor') {
+                                const distance = gripperPos.distanceTo(p.mesh.position);
+                                if (distance < 2) { // Radio de colisión
+                                    pieceInGripper = p;
+                                    pieceInGripper.state = 'picked';
+                                    pieceInGripper.pickedUp = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    break;
+                case 3: // Elevar - SOLTAR LA CAJA AQUÍ
+                    targetBase = 0;
+                    targetShoulder = 35;
+                    targetElbow = 0;
+                    // Soltar la caja
+                    if (pieceInGripper) {
+                        pieceInGripper.state = 'released';
+                        pieceInGripper = null;
                     }
                     break;
                 case 3:
@@ -479,10 +464,29 @@
                 pieceInGripper.mesh.position.y -= 1.2;
             }
             
-            // Limpiar piezas fuera de la banda (solo si no están siendo recogidas)
+            // Manejar cajas liberadas
+            pieces.forEach(p => {
+                if (p.state === 'released') {
+                    p.mesh.position.x += 0.05; // Se mueve un poco
+                    p.timeReleased = p.timeReleased || now;
+                    
+                    // Desaparecer después de 500ms
+                    if (now - p.timeReleased > 500) {
+                        scene.remove(p.mesh);
+                        p.state = 'deleted';
+                    }
+                }
+            });
+            
+            // Limpiar piezas
             for (let i = pieces.length - 1; i >= 0; i--) {
-                if (pieces[i].mesh.position.x > 20 && pieces[i].state === 'onConveyor' && pieces[i] !== pieceInGripper) {
+                // Eliminar las que salieron de la banda
+                if (pieces[i].mesh.position.x > 20 && pieces[i].state === 'onConveyor') {
                     scene.remove(pieces[i].mesh);
+                    pieces.splice(i, 1);
+                }
+                // Eliminar las marcadas como eliminadas
+                if (pieces[i].state === 'deleted') {
                     pieces.splice(i, 1);
                 }
             }
