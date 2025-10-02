@@ -259,15 +259,26 @@
             piece.position.set(-15, 1, 0);
             piece.castShadow = true;
             piece.receiveShadow = true;
-            piece.visible = true; // Asegurar que inicia visible
+            piece.visible = true;
             scene.add(piece);
             pieces.push({
                 mesh: piece,
                 state: 'onConveyor',
-                pickedUp: false,
-                timeReleased: 0
+                pickedUp: false
             });
         }
+        
+        // SECUENCIA DE MOVIMIENTOS PREDEFINIDOS
+        const movementSequence = [
+            { x: -5, y: 2, z: 0, duration: 800 },   // Punto 1
+            { x: 0, y: 4, z: 2, duration: 1000 },   // Punto 2
+            { x: 5, y: 3, z: 0, duration: 800 },    // Punto 3
+            { x: 8, y: 2, z: -1, duration: 1000 }   // Punto 4 (destino final)
+        ];
+        
+        let currentMovementIndex = 0;
+        let movementStartTime = 0;
+        let movementStartPos = { x: 0, y: 0, z: 0 };
         
         // Variables de animación
         let baseAngle = 0;
@@ -277,9 +288,11 @@
         let pieceInGripper = null;
         let animationPhase = 0;
         let phaseStartTime = Date.now();
+        let waitingToDisappear = false;
+        let disappearTime = 0;
         
-        // Solo 4 fases ahora: 0, 1, 2, 3
-        const phaseDurations = [100, 1800, 3500, 1500];
+        // Fases: 0=espera, 1=aproximarse, 2=secuencia de movimientos, 3=esperar y desaparecer
+        const phaseDurations = [100, 1800, 5000, 2000];
         
         function smoothAngle(current, target, speed) {
             const diff = target - current;
@@ -287,7 +300,7 @@
             return current + diff * speed;
         }
         
-        let singlePieceCreated = false;
+        let canCreatePiece = true;
         
         // Control de orientación del dispositivo
         let alpha = 0, beta = 0, gamma = 0;
@@ -328,10 +341,10 @@
             
             const now = Date.now();
             
-            // Generar solo UNA pieza al inicio
-            if (!singlePieceCreated && pieces.length === 0) {
+            // Crear pieza solo si está permitido y no hay ninguna
+            if (canCreatePiece && pieces.length === 0) {
                 createPiece();
-                singlePieceCreated = true;
+                canCreatePiece = false;
             }
             
             // Mover piezas en banda SOLO si no están siendo agarradas
@@ -342,17 +355,28 @@
                 }
             });
             
-            // Control de fases (solo 4 fases ahora)
+            // Control de fases
             const timeInPhase = now - phaseStartTime;
             if (timeInPhase >= phaseDurations[animationPhase]) {
                 animationPhase = (animationPhase + 1) % 4;
                 phaseStartTime = now;
                 
-                if (animationPhase === 0) {
+                if (animationPhase === 2) {
+                    // Iniciar secuencia de movimientos
+                    currentMovementIndex = 0;
+                    movementStartTime = now;
                     if (pieceInGripper) {
-                        pieceInGripper = null;
+                        movementStartPos = {
+                            x: pieceInGripper.mesh.position.x,
+                            y: pieceInGripper.mesh.position.y,
+                            z: pieceInGripper.mesh.position.z
+                        };
                     }
-                    singlePieceCreated = false;
+                }
+                
+                if (animationPhase === 3) {
+                    waitingToDisappear = true;
+                    disappearTime = now + 1000; // 1 segundo de espera
                 }
             }
             
@@ -360,22 +384,18 @@
             let targetBase = 0, targetShoulder = 0, targetElbow = 0;
             
             switch(animationPhase) {
-                case 0: // Posición inicial
+                case 0: // Posición inicial - esperar
                     targetBase = 0;
                     targetShoulder = 0;
                     targetElbow = 0;
                     break;
-                case 1: // Aproximarse
+                    
+                case 1: // Aproximarse y agarrar
                     targetBase = -55;
                     targetShoulder = 0;
                     targetElbow = 0;
-                    break;
-                case 2: // Recoger - DETECTAR COLISIÓN
-                    targetBase = 130;
-                    targetShoulder = 0;
-                    targetElbow = 0;
                     
-                    // Detectar colisión solo si aún no hay pieza agarrada
+                    // Detectar colisión
                     if (!pieceInGripper && gripperBase && gripperBase.getWorldPosition) {
                         const gripperPos = new THREE.Vector3();
                         gripperBase.getWorldPosition(gripperPos);
@@ -383,13 +403,12 @@
                         for (let p of pieces) {
                             if (p.state === 'onConveyor') {
                                 const distance = gripperPos.distanceTo(p.mesh.position);
-                                console.log('Distancia al gripper:', distance);
                                 
                                 if (distance < 4) {
                                     pieceInGripper = p;
                                     pieceInGripper.state = 'picked';
                                     pieceInGripper.pickedUp = true;
-                                    pieceInGripper.mesh.visible = true; // Asegurar visibilidad
+                                    pieceInGripper.mesh.visible = true;
                                     console.log('✅ Caja agarrada!');
                                     break;
                                 }
@@ -397,22 +416,62 @@
                         }
                     }
                     break;
-                case 3: // Volver y soltar
-                    targetBase = -55;
+                    
+                case 2: // Secuencia de movimientos predefinidos
+                    targetBase = 130;
                     targetShoulder = 0;
                     targetElbow = 0;
                     
-                    // Soltar la caja - la devolvemos a la banda
-                    if (pieceInGripper) {
-                        pieceInGripper.state = 'onConveyor';
-                        pieceInGripper.mesh.position.y = 1; // Altura de la banda
-                        pieceInGripper = null;
-                        console.log('📦 Caja devuelta a la banda!');
+                    // Ejecutar secuencia de movimientos
+                    if (pieceInGripper && pieceInGripper.state === 'picked') {
+                        const timeInMovement = now - movementStartTime;
+                        const currentMove = movementSequence[currentMovementIndex];
+                        
+                        if (currentMove) {
+                            const progress = Math.min(timeInMovement / currentMove.duration, 1);
+                            const easeProgress = progress < 0.5 
+                                ? 2 * progress * progress 
+                                : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                            
+                            pieceInGripper.mesh.position.x = movementStartPos.x + (currentMove.x - movementStartPos.x) * easeProgress;
+                            pieceInGripper.mesh.position.y = movementStartPos.y + (currentMove.y - movementStartPos.y) * easeProgress;
+                            pieceInGripper.mesh.position.z = movementStartPos.z + (currentMove.z - movementStartPos.z) * easeProgress;
+                            
+                            if (progress >= 1) {
+                                currentMovementIndex++;
+                                if (currentMovementIndex < movementSequence.length) {
+                                    movementStartTime = now;
+                                    movementStartPos = {
+                                        x: pieceInGripper.mesh.position.x,
+                                        y: pieceInGripper.mesh.position.y,
+                                        z: pieceInGripper.mesh.position.z
+                                    };
+                                }
+                            }
+                        }
+                    }
+                    break;
+                    
+                case 3: // Quedarse quieta 1 segundo y desaparecer
+                    targetBase = 130;
+                    targetShoulder = 0;
+                    targetElbow = 0;
+                    
+                    if (waitingToDisappear && now >= disappearTime) {
+                        if (pieceInGripper) {
+                            scene.remove(pieceInGripper.mesh);
+                            const index = pieces.indexOf(pieceInGripper);
+                            if (index > -1) pieces.splice(index, 1);
+                            pieceInGripper = null;
+                            console.log('💨 Caja desaparecida!');
+                        }
+                        waitingToDisappear = false;
+                        canCreatePiece = true; // Permitir crear nueva pieza
                     }
                     break;
             }
             
-            // Aplicar movimiento suave
+            // Aplicar movimiento suave al robot
             baseAngle = smoothAngle(baseAngle, targetBase, 0.09);
             shoulderAngle = smoothAngle(shoulderAngle, targetShoulder, 0.09);
             elbowAngle = smoothAngle(elbowAngle, targetElbow, 0.09);
@@ -427,17 +486,7 @@
                 link2Group.rotation.z = THREE.MathUtils.degToRad(elbowAngle);
             }
             
-            // ACTUALIZAR POSICIÓN DE PIEZA EN GRIPPER - ESTO HACE QUE SIGA AL BRAZO
-            if (pieceInGripper && pieceInGripper.state === 'picked' && gripperBase && gripperBase.getWorldPosition) {
-                const gripperPos = new THREE.Vector3();
-                gripperBase.getWorldPosition(gripperPos);
-                pieceInGripper.mesh.position.copy(gripperPos);
-                pieceInGripper.mesh.position.y -= 1.2;
-                pieceInGripper.mesh.visible = true; // Mantener visible
-                pieceInGripper.mesh.rotation.y += 0.02; // Mantener rotación
-            }
-            
-            // Limpiar piezas que salen de la escena
+            // Limpiar piezas que salen de la escena (solo las que están en la banda)
             for (let i = pieces.length - 1; i >= 0; i--) {
                 if (pieces[i].mesh.position.x > 20 && pieces[i].state === 'onConveyor') {
                     scene.remove(pieces[i].mesh);
