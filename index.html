@@ -88,15 +88,9 @@
         // ============================================
         // CONFIGURACIÓN DEL MODELO GLB
         // ============================================
-        // INSTRUCCIONES:
-        // 1. Sube tu archivo robot.glb a GitHub, Google Drive, o Dropbox
-        // 2. Obtén el enlace directo de descarga
-        // 3. Reemplaza 'TU_ENLACE_AQUI' con la URL de tu archivo
-        // 4. Ajusta la escala si es necesario (scale: 1 = tamaño original)
-        
         const ROBOT_CONFIG = {
             url: 'https://raw.githubusercontent.com/juanrios27/robot/main/Ensamble_Completo_de_dise%C3%B1o.glb',
-            scale: 10,             // Escala del modelo (ajustar según necesidad)
+            scale: 10,
             position: { x: 0, y: 0, z: 0 },
             rotation: { x: -90, y: 0, z: 0 }
         };
@@ -107,8 +101,6 @@
         
         // Cargar modelo GLB desde URL
         function loadRobotGLB() {
-            
-            
             const loader = new THREE.GLTFLoader();
             
             console.log('📦 Cargando modelo GLB desde:', ROBOT_CONFIG.url);
@@ -120,7 +112,6 @@
                     
                     const model = gltf.scene;
                     
-                    // Aplicar configuración
                     model.scale.set(ROBOT_CONFIG.scale, ROBOT_CONFIG.scale, ROBOT_CONFIG.scale);
                     model.position.set(ROBOT_CONFIG.position.x, ROBOT_CONFIG.position.y, ROBOT_CONFIG.position.z);
                     model.rotation.set(
@@ -129,7 +120,6 @@
                         THREE.MathUtils.degToRad(ROBOT_CONFIG.rotation.z)
                     );
                     
-                    // Habilitar sombras
                     model.traverse((child) => {
                         if (child.isMesh) {
                             child.castShadow = true;
@@ -139,8 +129,6 @@
                     
                     robotGroup.add(model);
                     
-                    // Intentar encontrar las partes del robot por nombre
-                    // Ajusta estos nombres según tu modelo CAD
                     baseRotation = model.getObjectByName('Base') || model.getObjectByName('base') || robotGroup;
                     link1Group = model.getObjectByName('Link1') || model.getObjectByName('Hombro') || robotGroup;
                     link2Group = model.getObjectByName('Link2') || model.getObjectByName('Codo') || robotGroup;
@@ -160,24 +148,6 @@
                     console.log('⚠️ Verifica que la URL sea correcta y el archivo sea accesible');
                 }
             );
-        }
-        
-        // Grupos temporales para animación mientras carga el modelo
-        function createTemporaryGroups() {
-            baseRotation = new THREE.Group();
-            baseRotation.position.y = 0;
-            robotGroup.add(baseRotation);
-            
-            link1Group = new THREE.Group();
-            baseRotation.add(link1Group);
-            
-            link2Group = new THREE.Group();
-            link1Group.add(link2Group);
-            
-            gripperBase = new THREE.Group();
-            link2Group.add(gripperBase);
-            
-            scene.add(robotGroup);
         }
         
         loadRobotGLB();
@@ -319,16 +289,52 @@
         }
         
         let lastPieceTime = Date.now();
+        let singlePieceCreated = false;
+        
+        // Control de orientación del dispositivo
+        let alpha = 0, beta = 0, gamma = 0;
+        
+        // Detectar orientación del dispositivo
+        if (window.DeviceOrientationEvent) {
+            window.addEventListener('deviceorientation', function(event) {
+                alpha = event.alpha || 0;
+                beta = event.beta || 0;
+                gamma = event.gamma || 0;
+            });
+        }
+        
+        // Control táctil para dispositivos sin giroscopio
+        let touchStartX = 0, touchStartY = 0;
+        let cameraRotationY = 0, cameraRotationX = 0;
+        
+        renderer.domElement.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
+        
+        renderer.domElement.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const deltaX = e.touches[0].clientX - touchStartX;
+            const deltaY = e.touches[0].clientY - touchStartY;
+            
+            cameraRotationY += deltaX * 0.005;
+            cameraRotationX += deltaY * 0.005;
+            
+            cameraRotationX = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, cameraRotationX));
+            
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
         
         function animate() {
             requestAnimationFrame(animate);
             
             const now = Date.now();
             
-            // Generar piezas
-            if (now - lastPieceTime > 4000) {
+            // Generar solo UNA pieza al inicio
+            if (!singlePieceCreated && pieces.length === 0) {
                 createPiece();
-                lastPieceTime = now;
+                singlePieceCreated = true;
             }
             
             // Mover piezas en banda
@@ -339,17 +345,36 @@
                 }
             });
             
-            // Control de fases
+            // Control de fases - esperar hasta case 2 para recoger
             const phaseElapsed = now - phaseStartTime;
             if (phaseElapsed >= phaseDurations[animationPhase]) {
+                // Solo avanzar a la siguiente fase si hay pieza disponible o ya está en proceso
+                if (animationPhase === 0 || animationPhase === 1) {
+                    // Verificar si hay pieza en posición correcta
+                    let pieceReady = false;
+                    for (let p of pieces) {
+                        if (p.state === 'onConveyor' && p.mesh.position.x >= -9 && p.mesh.position.x <= -7.5) {
+                            pieceReady = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!pieceReady && animationPhase === 1) {
+                        return;
+                    }
+                }
+                
                 animationPhase = (animationPhase + 1) % 8;
                 phaseStartTime = now;
                 
+                // Al completar el ciclo, eliminar pieza y preparar para crear nueva
                 if (animationPhase === 0 && pieceInGripper) {
                     if (pieceInGripper.state === 'delivered') {
                         scene.remove(pieceInGripper.mesh);
                         const idx = pieces.indexOf(pieceInGripper);
                         if (idx > -1) pieces.splice(idx, 1);
+                        
+                        singlePieceCreated = false;
                     }
                     pieceInGripper = null;
                 }
@@ -359,25 +384,25 @@
             let targetBase = 0, targetShoulder = 0, targetElbow = 0;
             
             switch(animationPhase) {
-                case 0: // Esperar
+                case 0:
                     targetBase = 0;
                     targetShoulder = 0;
                     targetElbow = 0;
                     if (!pieceInGripper) {
                         for (let p of pieces) {
-                            if (p.state === 'onConveyor' && p.mesh.position.x > -9 && p.mesh.position.x < -8) {
+                            if (p.state === 'onConveyor' && p.mesh.position.x >= -9 && p.mesh.position.x <= -7.5) {
                                 pieceInGripper = p;
                                 break;
                             }
                         }
                     }
                     break;
-                case 1: // Aproximarse
+                case 1:
                     targetBase = -55;
                     targetShoulder = 0;
                     targetElbow = 0;
                     break;
-                case 2: // Recoger
+                case 2:
                     targetBase = 130;
                     targetShoulder = 0;
                     targetElbow = 0;
@@ -386,31 +411,31 @@
                         pieceInGripper.pickedUp = true;
                     }
                     break;
-                case 3: // Elevar
+                case 3:
                     targetBase = 0;
                     targetShoulder = 35;
                     targetElbow = 0;
                     break;
-                case 4: // Transportar
+                case 4:
                     targetBase = 180;
                     targetShoulder = 0;
                     targetElbow = 0;
                     break;
-                case 5: // Posicionar
+                case 5:
                     targetBase = 75;
                     targetShoulder = 60;
                     targetElbow = 95;
                     break;
-                case 6: // Depositar
+                case 6:
                     targetBase = 75;
                     targetShoulder = 65;
                     targetElbow = 105;
                     if (pieceInGripper && pieceInGripper.state === 'picked') {
-                        pieceInGripper.mesh.position.set(8, 1.9, 0);
+                        scene.remove(pieceInGripper.mesh);
                         pieceInGripper.state = 'delivered';
                     }
                     break;
-                case 7: // Retornar
+                case 7:
                     targetBase = 0;
                     targetShoulder = 20;
                     targetElbow = 40;
@@ -454,11 +479,23 @@
                 ind.material.emissiveIntensity = 0.5 + Math.sin(now * 0.003 + i) * 0.4;
             });
             
-            // Cámara orbital suave
-            const t = now * 0.00025;
-            camera.position.x = Math.cos(t) * 16;
-            camera.position.z = Math.sin(t) * 16;
-            camera.position.y = 10 + Math.sin(t * 0.5) * 2;
+            // Actualizar cámara según orientación del dispositivo
+            const radius = 16;
+            const height = 10;
+            
+            if (alpha !== 0 || beta !== 0 || gamma !== 0) {
+                const angleY = THREE.MathUtils.degToRad(alpha);
+                const angleX = THREE.MathUtils.degToRad(beta - 90) * 0.3;
+                
+                camera.position.x = Math.sin(angleY) * radius;
+                camera.position.z = Math.cos(angleY) * radius;
+                camera.position.y = height + angleX * 5;
+            } else {
+                camera.position.x = Math.sin(cameraRotationY) * radius;
+                camera.position.z = Math.cos(cameraRotationY) * radius;
+                camera.position.y = height + Math.sin(cameraRotationX) * 8;
+            }
+            
             camera.lookAt(0, 3, 0);
             
             renderer.render(scene, camera);
