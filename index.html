@@ -85,7 +85,7 @@
                 zOffset: -12,
                 pieceType: 'cube',
                 color: 0xff9500,
-                geometry: null, // Se crea después
+                geometry: null,
                 label: '🟧'
             },
             {
@@ -213,8 +213,8 @@
             return { station: inspectionStation, indicators };
         }
         
-        // FUNCIÓN PARA CARGAR ROBOT GLB
-        function loadRobotGLB(zOffset, lineId) {
+        // FUNCIÓN PARA CARGAR ROBOT GLB - CADA UNO INDEPENDIENTE
+        function loadRobotGLB(zOffset, lineId, robotData) {
             const ROBOT_CONFIG = {
                 url: 'https://raw.githubusercontent.com/juanrios27/robot/main/Ensamble_Completo_de_dise%C3%B1o.glb',
                 scale: 10,
@@ -222,18 +222,21 @@
                 rotation: { x: -90, y: 0, z: 0 }
             };
             
-            const robotGroup = new THREE.Group();
             const loader = new THREE.GLTFLoader();
             
-            console.log(`📦 Cargando robot para línea ${lineId} en Z=${zOffset}`);
+            console.log(`📦 Cargando robot ${lineId} en Z=${zOffset}`);
             
             loader.load(
                 ROBOT_CONFIG.url,
                 function(gltf) {
-                    const model = gltf.scene.clone();
+                    // Crear un grupo completamente NUEVO para este robot
+                    const robotGroup = new THREE.Group();
+                    
+                    // CLONAR el modelo para que sea independiente
+                    const model = gltf.scene.clone(true);
                     
                     model.scale.set(ROBOT_CONFIG.scale, ROBOT_CONFIG.scale, ROBOT_CONFIG.scale);
-                    model.position.set(ROBOT_CONFIG.position.x, ROBOT_CONFIG.position.y, ROBOT_CONFIG.position.z);
+                    model.position.set(0, 0, 0); // Posición relativa al grupo
                     model.rotation.set(
                         THREE.MathUtils.degToRad(ROBOT_CONFIG.rotation.x),
                         THREE.MathUtils.degToRad(ROBOT_CONFIG.rotation.y),
@@ -248,30 +251,33 @@
                     });
                     
                     robotGroup.add(model);
+                    
+                    // Posicionar el GRUPO en el mundo
+                    robotGroup.position.set(0, 0, zOffset);
                     scene.add(robotGroup);
                     
-                    robots[lineId].group = robotGroup;
-                    robots[lineId].baseRotation = model.getObjectByName('Base') || robotGroup;
-                    robots[lineId].link1Group = model.getObjectByName('Link1') || robotGroup;
-                    robots[lineId].link2Group = model.getObjectByName('Link2') || robotGroup;
-                    robots[lineId].loaded = true;
+                    // Guardar referencias INDEPENDIENTES para este robot
+                    robotData.group = robotGroup;
+                    robotData.model = model;
+                    robotData.baseRotation = model.getObjectByName('Base') || model;
+                    robotData.link1Group = model.getObjectByName('Link1') || model;
+                    robotData.link2Group = model.getObjectByName('Link2') || model;
+                    robotData.loaded = true;
                     
-                    console.log(`✅ Robot ${lineId} cargado`);
+                    console.log(`✅ Robot ${lineId} cargado independientemente en Z=${zOffset}`);
                 },
                 undefined,
                 function(error) {
                     console.error(`❌ Error cargando robot ${lineId}:`, error);
                 }
             );
-            
-            return robotGroup;
         }
         
         // CREAR LAS 3 LÍNEAS DE PRODUCCIÓN
         const conveyors = [];
         const inspectionStations = [];
         const robots = [];
-        const pieces = [[], [], []]; // Array de piezas para cada línea
+        const pieces = [[], [], []];
         
         productionLines.forEach((line, index) => {
             // Crear banda
@@ -280,42 +286,51 @@
             // Crear estación de inspección
             inspectionStations.push(createInspectionStation(line.zOffset, line.color));
             
-            // Inicializar robot
-            robots.push({
+            // Inicializar robot con variables COMPLETAMENTE INDEPENDIENTES
+            const robotData = {
                 id: index,
+                zOffset: line.zOffset,
                 group: null,
+                model: null,
                 baseRotation: null,
                 link1Group: null,
                 link2Group: null,
                 loaded: false,
+                // Variables de animación PROPIAS
                 baseAngle: 0,
                 shoulderAngle: 0,
                 elbowAngle: 0,
+                targetBaseAngle: 0,
+                targetShoulderAngle: 0,
+                targetElbowAngle: 0,
+                // Variables de control PROPIAS
                 pieceInGripper: null,
                 animationPhase: 0,
-                phaseStartTime: Date.now(),
+                phaseStartTime: Date.now() + (index * 500), // Desfase inicial
                 currentMovementIndex: 0,
                 movementStartTime: 0,
                 movementStartPos: { x: 0, y: 0, z: 0 },
                 sequenceInitialized: false,
                 disappearTime: 0,
                 canCreatePiece: true
-            });
+            };
             
-            // Cargar modelo GLB del robot
-            loadRobotGLB(line.zOffset, index);
+            robots.push(robotData);
+            
+            // Cargar modelo GLB de forma independiente
+            loadRobotGLB(line.zOffset, index, robotData);
         });
         
-        // SECUENCIA DE MOVIMIENTOS (ajustada para cada línea según su Z)
+        // SECUENCIA DE MOVIMIENTOS (se ajusta para cada línea con su Z)
         const movementSequence = [
             { x: -4, y: 1, z: 0, duration: 1000, baseAngle: 130, shoulderAngle: 0, elbowAngle: 0 },
-            { x: -3, y: 1, z: -2.65, duration: 1000, baseAngle: 93, shoulderAngle: 0, elbowAngle: 0 },
-            { x: -2, y: 1, z: -3.46, duration: 1000, baseAngle: 73, shoulderAngle: 0, elbowAngle: 0 },
+            { x: -3, y: 1, z: -2.65, duration: 1000, baseAngle: 95, shoulderAngle: 0, elbowAngle: 0 },
+            { x: -2, y: 1, z: -3.46, duration: 1000, baseAngle: 75, shoulderAngle: 0, elbowAngle: 0 },
             { x: -1, y: 1, z: -3.87, duration: 1200, baseAngle: 55, shoulderAngle: 0, elbowAngle: 0 },
             { x: 0, y: 1, z: -4, duration: 1200, baseAngle: 40, shoulderAngle: 0, elbowAngle: 0 },
             { x: 1, y: 1, z: -3.87, duration: 1000, baseAngle: 25, shoulderAngle: 0, elbowAngle: 0 },
-            { x: 2, y: 1, z: -3.46, duration: 1000, baseAngle: 7, shoulderAngle: 0, elbowAngle: 0 },
-            { x: 3, y: 1, z: -2.65, duration: 1000, baseAngle: -11.5, shoulderAngle: 0, elbowAngle: 0 },
+            { x: 2, y: 1, z: -3.46, duration: 1000, baseAngle: 0, shoulderAngle: 0, elbowAngle: 0 },
+            { x: 3, y: 1, z: -2.65, duration: 1000, baseAngle: -20.5, shoulderAngle: 0, elbowAngle: 0 },
             { x: 4, y: 1, z: 0, duration: 1200, baseAngle: -50, shoulderAngle: 0, elbowAngle: 0 }
         ];
         
@@ -407,7 +422,7 @@
             
             const now = Date.now();
             
-            // PROCESAR CADA LÍNEA DE PRODUCCIÓN INDEPENDIENTEMENTE
+            // PROCESAR CADA LÍNEA DE PRODUCCIÓN DE FORMA COMPLETAMENTE INDEPENDIENTE
             robots.forEach((robot, lineId) => {
                 if (!robot.loaded) return;
                 
@@ -428,15 +443,13 @@
                     }
                 });
                 
-                // Definir targets según fase
-                let targetBase = 0, targetShoulder = 0, targetElbow = 0;
                 const timeInPhase = now - robot.phaseStartTime;
                 
                 // FASE 0: Posición inicial
                 if (robot.animationPhase === 0) {
-                    targetBase = 0;
-                    targetShoulder = 0;
-                    targetElbow = 0;
+                    robot.targetBaseAngle = 0;
+                    robot.targetShoulderAngle = 0;
+                    robot.targetElbowAngle = 0;
                     
                     if (timeInPhase > 500) {
                         robot.animationPhase = 1;
@@ -446,9 +459,9 @@
                 
                 // FASE 1: Aproximarse
                 else if (robot.animationPhase === 1) {
-                    targetBase = -50;
-                    targetShoulder = 0;
-                    targetElbow = 0;
+                    robot.targetBaseAngle = -50;
+                    robot.targetShoulderAngle = 0;
+                    robot.targetElbowAngle = 0;
                     
                     if (timeInPhase > 2000) {
                         robot.animationPhase = 2;
@@ -459,9 +472,9 @@
                 
                 // FASE 2: Agarrar y mover
                 else if (robot.animationPhase === 2) {
-                    targetBase = 130;
-                    targetShoulder = 0;
-                    targetElbow = 0;
+                    robot.targetBaseAngle = 130;
+                    robot.targetShoulderAngle = 0;
+                    robot.targetElbowAngle = 0;
                     
                     // Detectar colisión
                     if (!robot.pieceInGripper) {
@@ -511,9 +524,9 @@
                             robot.pieceInGripper.mesh.position.set(newX, newY, newZ);
                             robot.pieceInGripper.mesh.rotation.y += 0.02;
                             
-                            targetBase = currentMove.baseAngle;
-                            targetShoulder = currentMove.shoulderAngle;
-                            targetElbow = currentMove.elbowAngle;
+                            robot.targetBaseAngle = currentMove.baseAngle;
+                            robot.targetShoulderAngle = currentMove.shoulderAngle;
+                            robot.targetElbowAngle = currentMove.elbowAngle;
                             
                             if (progress >= 1) {
                                 robot.currentMovementIndex++;
@@ -536,9 +549,9 @@
                 
                 // FASE 3: Desaparecer y reiniciar
                 else if (robot.animationPhase === 3) {
-                    targetBase = 130;
-                    targetShoulder = 0;
-                    targetElbow = 0;
+                    robot.targetBaseAngle = 130;
+                    robot.targetShoulderAngle = 0;
+                    robot.targetElbowAngle = 0;
                     
                     if (now >= robot.disappearTime && robot.pieceInGripper) {
                         scene.remove(robot.pieceInGripper.mesh);
@@ -552,11 +565,12 @@
                     }
                 }
                 
-                // Aplicar movimiento suave
-                robot.baseAngle = smoothAngle(robot.baseAngle, targetBase, 0.09);
-                robot.shoulderAngle = smoothAngle(robot.shoulderAngle, targetShoulder, 0.09);
-                robot.elbowAngle = smoothAngle(robot.elbowAngle, targetElbow, 0.09);
+                // Aplicar movimiento suave usando las variables PROPIAS del robot
+                robot.baseAngle = smoothAngle(robot.baseAngle, robot.targetBaseAngle, 0.09);
+                robot.shoulderAngle = smoothAngle(robot.shoulderAngle, robot.targetShoulderAngle, 0.09);
+                robot.elbowAngle = smoothAngle(robot.elbowAngle, robot.targetElbowAngle, 0.09);
                 
+                // Aplicar rotaciones a las partes específicas de ESTE robot
                 if (robot.baseRotation && robot.baseRotation.rotation) {
                     robot.baseRotation.rotation.y = THREE.MathUtils.degToRad(robot.baseAngle);
                 }
