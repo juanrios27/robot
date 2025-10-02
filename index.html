@@ -337,7 +337,7 @@
                 singlePieceCreated = true;
             }
             
-            // Mover piezas en banda
+            // Mover piezas en banda (solo las que están en estado 'onConveyor')
             pieces.forEach(p => {
                 if (p.state === 'onConveyor') {
                     p.mesh.position.x += 0.035;
@@ -352,7 +352,7 @@
             let pieceInPickupZone = false;
             let targetPiece = null;
             for (let p of pieces) {
-                if (p.state === 'onConveyor' && p.mesh.position.x >= -8.5 && p.mesh.position.x <= -7.8) {
+                if (p.state === 'onConveyor' && p.mesh.position.x >= -9.5 && p.mesh.position.x <= -7.0) {
                     pieceInPickupZone = true;
                     targetPiece = p;
                     break;
@@ -367,6 +367,7 @@
                 canAdvance = phaseElapsed >= phaseDurations[0];
                 if (canAdvance && !pieceInGripper && targetPiece) {
                     pieceInGripper = targetPiece;
+                    pieceInGripper.state = 'waiting'; // Cambiar estado para que deje de moverse
                 }
             } else if (animationPhase === 1) {
                 // Case 1: Esperar a que la pieza llegue a la zona de recogida
@@ -375,6 +376,7 @@
                 } else if (!pieceInGripper && targetPiece) {
                     // Si detectamos una pieza nueva, asignarla
                     pieceInGripper = targetPiece;
+                    pieceInGripper.state = 'waiting'; // Cambiar estado para que deje de moverse
                 }
                 // Si no hay pieza en zona, esperamos indefinidamente
             } else {
