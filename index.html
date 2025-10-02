@@ -195,7 +195,7 @@
         const inspectionStation = new THREE.Group();
         
         const stationBase = new THREE.Mesh(
-            new THREE.BoxGeometry(3.5, 1.8, 3.5),
+            new THREE.BoxGeometry(3.5, 0.5, 3.5),
             new THREE.MeshStandardMaterial({ 
                 color: 0x27ae60,
                 roughness: 0.5,
@@ -238,7 +238,7 @@
             inspectionStation.add(light);
         }
         
-        inspectionStation.position.set(8, 0, 0);
+        inspectionStation.position.set(3, 0, 0);
         scene.add(inspectionStation);
         
         // SISTEMA DE PIEZAS
