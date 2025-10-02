@@ -277,7 +277,8 @@
         let animationPhase = 0;
         let phaseStartTime = Date.now();
         
-        const phaseDurations = [100, 1800, 3500, 1200, 2200, 1600, 1000, 1500];
+        // Solo 4 fases ahora: 0, 1, 2, 3
+        const phaseDurations = [100, 1800, 3500, 1500];
         
         function smoothAngle(current, target, speed) {
             const diff = target - current;
@@ -332,18 +333,21 @@
                 singlePieceCreated = true;
             }
             
-            // Mover piezas en banda
+            // Mover piezas en banda SOLO si no están siendo agarradas
             pieces.forEach(p => {
                 if (p.state === 'onConveyor') {
                     p.mesh.position.x += 0.035;
                     p.mesh.rotation.y += 0.02;
+                } else if (p.state === 'released') {
+                    // Las liberadas se mueven un poco
+                    p.mesh.position.x += 0.05;
                 }
             });
             
-            // Control de fases
+            // Control de fases (solo 4 fases ahora)
             const timeInPhase = now - phaseStartTime;
             if (timeInPhase >= phaseDurations[animationPhase]) {
-                animationPhase = (animationPhase + 1) % 8;
+                animationPhase = (animationPhase + 1) % 4;
                 phaseStartTime = now;
                 
                 if (animationPhase === 0) {
@@ -358,20 +362,22 @@
             let targetBase = 0, targetShoulder = 0, targetElbow = 0;
             
             switch(animationPhase) {
-                case 0:
+                case 0: // Posición inicial
                     targetBase = 0;
                     targetShoulder = 0;
                     targetElbow = 0;
                     break;
-                case 1:
+                case 1: // Aproximarse
                     targetBase = -55;
                     targetShoulder = 0;
                     targetElbow = 0;
                     break;
-                case 2:
+                case 2: // Recoger - DETECTAR COLISIÓN
                     targetBase = 130;
                     targetShoulder = 0;
                     targetElbow = 0;
+                    
+                    // Detectar colisión solo si aún no hay pieza agarrada
                     if (!pieceInGripper && gripperBase && gripperBase.getWorldPosition) {
                         const gripperPos = new THREE.Vector3();
                         gripperBase.getWorldPosition(gripperPos);
@@ -379,45 +385,31 @@
                         for (let p of pieces) {
                             if (p.state === 'onConveyor') {
                                 const distance = gripperPos.distanceTo(p.mesh.position);
-                                if (distance < 2) {
+                                console.log('Distancia al gripper:', distance);
+                                
+                                if (distance < 2.5) {
                                     pieceInGripper = p;
                                     pieceInGripper.state = 'picked';
                                     pieceInGripper.pickedUp = true;
+                                    console.log('✅ Caja agarrada!');
                                     break;
                                 }
                             }
                         }
                     }
                     break;
-                case 3:
+                case 3: // Volver y soltar
                     targetBase = -55;
                     targetShoulder = 0;
                     targetElbow = 0;
+                    
+                    // Soltar la caja
                     if (pieceInGripper) {
                         pieceInGripper.state = 'released';
                         pieceInGripper.timeReleased = now;
                         pieceInGripper = null;
+                        console.log('📦 Caja liberada!');
                     }
-                    break;
-                case 4:
-                    targetBase = 180;
-                    targetShoulder = 0;
-                    targetElbow = 0;
-                    break;
-                case 5:
-                    targetBase = 75;
-                    targetShoulder = 60;
-                    targetElbow = 95;
-                    break;
-                case 6:
-                    targetBase = 75;
-                    targetShoulder = 65;
-                    targetElbow = 105;
-                    break;
-                case 7:
-                    targetBase = 0;
-                    targetShoulder = 20;
-                    targetElbow = 40;
                     break;
             }
             
@@ -436,7 +428,7 @@
                 link2Group.rotation.z = THREE.MathUtils.degToRad(elbowAngle);
             }
             
-            // Actualizar posición de pieza en gripper
+            // ACTUALIZAR POSICIÓN DE PIEZA EN GRIPPER - ESTO HACE QUE SIGA AL BRAZO
             if (pieceInGripper && pieceInGripper.state === 'picked' && gripperBase && gripperBase.getWorldPosition) {
                 const gripperPos = new THREE.Vector3();
                 gripperBase.getWorldPosition(gripperPos);
@@ -444,11 +436,9 @@
                 pieceInGripper.mesh.position.y -= 1.2;
             }
             
-            // Manejar cajas liberadas
+            // Manejar cajas liberadas - desaparecen después de 500ms
             pieces.forEach(p => {
-                if (p.state === 'released') {
-                    p.mesh.position.x += 0.05;
-                    
+                if (p.state === 'released' && p.timeReleased > 0) {
                     if (now - p.timeReleased > 500) {
                         scene.remove(p.mesh);
                         p.state = 'deleted';
