@@ -270,7 +270,7 @@
         
         // SECUENCIA DE MOVIMIENTOS PREDEFINIDOS
         const movementSequence = [
-            { x: 1, y: 1, z: 1, duration: 2000 },
+            { x: -5, y: 2, z: 0, duration: 1000 },
             { x: 0, y: 4, z: 2, duration: 1200 },
             { x: 5, y: 3, z: 0, duration: 1000 },
             { x: 8, y: 2, z: -1, duration: 1200 }
@@ -430,7 +430,7 @@
                     console.log('🎯 Caja en gripper existe:', !!pieceInGripper);
                 }
                 
-                // Ejecutar movimientos
+                // Ejecutar movimientos - MOVER CAJA Y BRAZO JUNTOS
                 if (pieceInGripper && sequenceInitialized && pieceInGripper.state === 'picked') {
                     const timeInMovement = now - movementStartTime;
                     const currentMove = movementSequence[currentMovementIndex];
@@ -447,10 +447,20 @@
                         const newY = movementStartPos.y + (currentMove.y - movementStartPos.y) * easeProgress;
                         const newZ = movementStartPos.z + (currentMove.z - movementStartPos.z) * easeProgress;
                         
+                        // Mover la caja
                         pieceInGripper.mesh.position.set(newX, newY, newZ);
                         pieceInGripper.mesh.rotation.y += 0.02;
                         
-                        console.log(`📍 Punto ${currentMovementIndex + 1}/4 - Progreso: ${(progress * 100).toFixed(0)}% - Pos: (${newX.toFixed(1)}, ${newY.toFixed(1)}, ${newZ.toFixed(1)})`);
+                        // MOVER EL BRAZO PARA QUE SIGA A LA CAJA
+                        // Calcular ángulo base según posición X y Z de la caja
+                        const angleToBox = Math.atan2(newX, newZ) * (180 / Math.PI);
+                        targetBase = angleToBox;
+                        
+                        // Calcular altura del hombro según Y de la caja
+                        const heightFactor = (newY - 2) * 15; // Ajustar según altura
+                        targetShoulder = Math.max(-45, Math.min(45, heightFactor));
+                        
+                        console.log(`📍 Punto ${currentMovementIndex + 1}/4 - Progreso: ${(progress * 100).toFixed(0)}% - Pos: (${newX.toFixed(1)}, ${newY.toFixed(1)}, ${newZ.toFixed(1)}) - Ángulos: Base=${targetBase.toFixed(1)}° Hombro=${targetShoulder.toFixed(1)}°`);
                         
                         // Pasar al siguiente punto
                         if (progress >= 1) {
