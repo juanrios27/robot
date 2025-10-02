@@ -379,26 +379,43 @@
                 targetShoulder = 0;
                 targetElbow = 0;
                 
-                // Detectar colisión
-                if (!pieceInGripper && gripperBase && gripperBase.getWorldPosition) {
-                    const gripperPos = new THREE.Vector3();
-                    gripperBase.getWorldPosition(gripperPos);
-                    
+                // Detectar colisión continuamente
+                if (!pieceInGripper) {
                     for (let p of pieces) {
                         if (p.state === 'onConveyor') {
-                            const distance = gripperPos.distanceTo(p.mesh.position);
+                            // Calcular distancia simple en el plano XZ
+                            const dx = p.mesh.position.x - 0; // Robot está en x=0
+                            const dz = p.mesh.position.z - 0; // Robot está en z=0
+                            const distance2D = Math.sqrt(dx * dx + dz * dz);
                             
-                            if (distance < 4) {
+                            console.log(`📏 Distancia 2D caja-robot: ${distance2D.toFixed(2)} | Pos caja: (${p.mesh.position.x.toFixed(1)}, ${p.mesh.position.y.toFixed(1)}, ${p.mesh.position.z.toFixed(1)})`);
+                            
+                            // Agarrar cuando está cerca del robot
+                            if (distance2D < 4) {
                                 pieceInGripper = p;
                                 pieceInGripper.state = 'picked';
                                 pieceInGripper.mesh.visible = true;
-                                console.log('✅ Caja agarrada!');
+                                console.log('✅ Caja agarrada! Estado:', pieceInGripper.state);
+                                break;
                             }
                         }
                     }
                 }
                 
+                // Hacer que la caja siga al gripper mientras se acerca
+                if (pieceInGripper && pieceInGripper.state === 'picked' && gripperBase && gripperBase.getWorldPosition) {
+                    const gripperPos = new THREE.Vector3();
+                    gripperBase.getWorldPosition(gripperPos);
+                    pieceInGripper.mesh.position.copy(gripperPos);
+                    pieceInGripper.mesh.position.y -= 1.2;
+                }
+                
                 if (timeInPhase > 2000) {
+                    if (pieceInGripper) {
+                        console.log('✅ Caja confirmada en gripper, pasando a fase 2');
+                    } else {
+                        console.log('⚠️ No se agarró ninguna caja, pero pasando a fase 2');
+                    }
                     animationPhase = 2;
                     phaseStartTime = now;
                     sequenceInitialized = false;
@@ -512,13 +529,7 @@
                 link2Group.rotation.z = THREE.MathUtils.degToRad(elbowAngle);
             }
             
-            // Hacer que la caja siga al gripper SOLO en fase 1
-            if (animationPhase === 1 && pieceInGripper && gripperBase && gripperBase.getWorldPosition) {
-                const gripperPos = new THREE.Vector3();
-                gripperBase.getWorldPosition(gripperPos);
-                pieceInGripper.mesh.position.copy(gripperPos);
-                pieceInGripper.mesh.position.y -= 1.2;
-            }
+            // La caja sigue al gripper en fase 1 (ya lo hace dentro del if de fase 1)
             
             // Limpiar piezas que salen de la escena
             for (let i = pieces.length - 1; i >= 0; i--) {
