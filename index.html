@@ -453,7 +453,7 @@
                         
                         // MOVER EL BRAZO PARA QUE SIGA A LA CAJA
                         // Calcular ángulo base según posición X y Z de la caja
-                        const angleToBox = Math.atan2(newX, newZ) * (180 / Math.PI);
+                        const angleToBox = -Math.atan2(newX, newZ) * (180 / Math.PI);
                         targetBase = angleToBox;
                         
                         // Calcular altura del hombro según Y de la caja
