@@ -207,7 +207,7 @@
                 inspectionStation.add(light);
             }
             
-            inspectionStation.position.set(4, 0.25, zOffset);
+            inspectionStation.position.set(4, -0.5, zOffset);
             scene.add(inspectionStation);
             
             return { station: inspectionStation, indicators };
@@ -219,7 +219,7 @@
                 url: 'https://raw.githubusercontent.com/juanrios27/robot/main/Ensamble_Completo_de_dise%C3%B1o.glb',
                 scale: 10,
                 position: { x: 0, y: 0, z: zOffset },
-                rotation: { x: -90, y: 0, z: 0 }
+                rotation: { x: 0, y: 0, z: 0 }
             };
             
             const loader = new THREE.GLTFLoader();
