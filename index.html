@@ -85,9 +85,7 @@
         const gridHelper = new THREE.GridHelper(50, 50, 0x333333, 0x222222);
         scene.add(gridHelper);
         
-        // ============================================
         // CONFIGURACIÓN DEL MODELO GLB
-        // ============================================
         const ROBOT_CONFIG = {
             url: 'https://raw.githubusercontent.com/juanrios27/robot/main/Ensamble_Completo_de_dise%C3%B1o.glb',
             scale: 10,
@@ -99,7 +97,7 @@
         let baseRotation, link1Group, link2Group, gripperBase;
         let robotLoaded = false;
         
-        // Cargar modelo GLB desde URL
+        // Cargar modelo GLB
         function loadRobotGLB() {
             const loader = new THREE.GLTFLoader();
             
@@ -145,7 +143,6 @@
                 },
                 function(error) {
                     console.error('❌ Error al cargar el modelo GLB:', error);
-                    console.log('⚠️ Verifica que la URL sea correcta y el archivo sea accesible');
                 }
             );
         }
@@ -178,7 +175,6 @@
         beltSurface.position.y = 0.65;
         conveyorGroup.add(beltSurface);
         
-        // Bordes
         const edgeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.5 });
         
         const edge1 = new THREE.Mesh(
@@ -267,7 +263,8 @@
             pieces.push({
                 mesh: piece,
                 state: 'onConveyor',
-                pickedUp: false
+                pickedUp: false,
+                timeReleased: 0
             });
         }
         
@@ -288,13 +285,11 @@
             return current + diff * speed;
         }
         
-        let lastPieceTime = Date.now();
         let singlePieceCreated = false;
         
         // Control de orientación del dispositivo
         let alpha = 0, beta = 0, gamma = 0;
         
-        // Detectar orientación del dispositivo
         if (window.DeviceOrientationEvent) {
             window.addEventListener('deviceorientation', function(event) {
                 alpha = event.alpha || 0;
@@ -303,7 +298,7 @@
             });
         }
         
-        // Control táctil para dispositivos sin giroscopio
+        // Control táctil
         let touchStartX = 0, touchStartY = 0;
         let cameraRotationY = 0, cameraRotationX = 0;
         
@@ -337,7 +332,7 @@
                 singlePieceCreated = true;
             }
             
-            // Mover piezas en banda (solo las que están en estado 'onConveyor')
+            // Mover piezas en banda
             pieces.forEach(p => {
                 if (p.state === 'onConveyor') {
                     p.mesh.position.x += 0.035;
@@ -345,16 +340,12 @@
                 }
             });
             
-            // Control de fases - esperar hasta que la caja esté en posición
-            const phaseElapsed = now - phaseStartTime;
-            
-            // Control de fases simple - avanzar según tiempo
-            const phaseElapsed = now - phaseStartTime;
-            if (phaseElapsed >= phaseDurations[animationPhase]) {
+            // Control de fases
+            const timeInPhase = now - phaseStartTime;
+            if (timeInPhase >= phaseDurations[animationPhase]) {
                 animationPhase = (animationPhase + 1) % 8;
                 phaseStartTime = now;
                 
-                // Al completar el ciclo, soltar la pieza
                 if (animationPhase === 0) {
                     if (pieceInGripper) {
                         pieceInGripper = null;
@@ -367,21 +358,20 @@
             let targetBase = 0, targetShoulder = 0, targetElbow = 0;
             
             switch(animationPhase) {
-                case 0: // Posición inicial
+                case 0:
                     targetBase = 0;
                     targetShoulder = 0;
                     targetElbow = 0;
                     break;
-                case 1: // Aproximarse
+                case 1:
                     targetBase = -55;
                     targetShoulder = 0;
                     targetElbow = 0;
                     break;
-                case 2: // Recoger - detectar colisión con caja
+                case 2:
                     targetBase = 130;
                     targetShoulder = 0;
                     targetElbow = 0;
-                    // Detectar colisión con la caja
                     if (!pieceInGripper && gripperBase && gripperBase.getWorldPosition) {
                         const gripperPos = new THREE.Vector3();
                         gripperBase.getWorldPosition(gripperPos);
@@ -389,7 +379,7 @@
                         for (let p of pieces) {
                             if (p.state === 'onConveyor') {
                                 const distance = gripperPos.distanceTo(p.mesh.position);
-                                if (distance < 2) { // Radio de colisión
+                                if (distance < 2) {
                                     pieceInGripper = p;
                                     pieceInGripper.state = 'picked';
                                     pieceInGripper.pickedUp = true;
@@ -399,20 +389,15 @@
                         }
                     }
                     break;
-                case 3: // Elevar - SOLTAR LA CAJA AQUÍ
-                    targetBase = 0;
-                    targetShoulder = 35;
-                    targetElbow = 0;
-                    // Soltar la caja
-                    if (pieceInGripper) {
-                        pieceInGripper.state = 'released';
-                        pieceInGripper = null;
-                    }
-                    break;
                 case 3:
                     targetBase = 0;
                     targetShoulder = 35;
                     targetElbow = 0;
+                    if (pieceInGripper) {
+                        pieceInGripper.state = 'released';
+                        pieceInGripper.timeReleased = now;
+                        pieceInGripper = null;
+                    }
                     break;
                 case 4:
                     targetBase = 180;
@@ -428,10 +413,6 @@
                     targetBase = 75;
                     targetShoulder = 65;
                     targetElbow = 105;
-                    if (pieceInGripper && pieceInGripper.state === 'picked') {
-                        scene.remove(pieceInGripper.mesh);
-                        pieceInGripper.state = 'delivered';
-                    }
                     break;
                 case 7:
                     targetBase = 0;
@@ -445,7 +426,6 @@
             shoulderAngle = smoothAngle(shoulderAngle, targetShoulder, 0.09);
             elbowAngle = smoothAngle(elbowAngle, targetElbow, 0.09);
             
-            // Aplicar rotaciones solo si los grupos existen
             if (baseRotation && baseRotation.rotation) {
                 baseRotation.rotation.y = THREE.MathUtils.degToRad(baseAngle);
             }
@@ -467,10 +447,8 @@
             // Manejar cajas liberadas
             pieces.forEach(p => {
                 if (p.state === 'released') {
-                    p.mesh.position.x += 0.05; // Se mueve un poco
-                    p.timeReleased = p.timeReleased || now;
+                    p.mesh.position.x += 0.05;
                     
-                    // Desaparecer después de 500ms
                     if (now - p.timeReleased > 500) {
                         scene.remove(p.mesh);
                         p.state = 'deleted';
@@ -480,12 +458,10 @@
             
             // Limpiar piezas
             for (let i = pieces.length - 1; i >= 0; i--) {
-                // Eliminar las que salieron de la banda
                 if (pieces[i].mesh.position.x > 20 && pieces[i].state === 'onConveyor') {
                     scene.remove(pieces[i].mesh);
                     pieces.splice(i, 1);
                 }
-                // Eliminar las marcadas como eliminadas
                 if (pieces[i].state === 'deleted') {
                     pieces.splice(i, 1);
                 }
@@ -496,7 +472,7 @@
                 ind.material.emissiveIntensity = 0.5 + Math.sin(now * 0.003 + i) * 0.4;
             });
             
-            // Actualizar cámara según orientación del dispositivo
+            // Actualizar cámara
             const radius = 16;
             const height = 10;
             
