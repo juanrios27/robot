@@ -459,9 +459,9 @@
                 
                 // FASE 1: Aproximarse
                 else if (robot.animationPhase === 1) {
-                    robot.targetBaseAngle = -50;
+                    robot.targetBaseAngle = 0;
                     robot.targetShoulderAngle = 130;
-                    robot.targetElbowAngle = 0;
+                    robot.targetElbowAngle = -50;
                     
                     if (timeInPhase > 2000) {
                         robot.animationPhase = 2;
@@ -472,9 +472,9 @@
                 
                 // FASE 2: Agarrar y mover
                 else if (robot.animationPhase === 2) {
-                    robot.targetBaseAngle = 130;
+                    robot.targetBaseAngle = 0;
                     robot.targetShoulderAngle = 130;
-                    robot.targetElbowAngle = 0;
+                    robot.targetElbowAngle = 130;
                     
                     // Detectar colisión
                     if (!robot.pieceInGripper) {
