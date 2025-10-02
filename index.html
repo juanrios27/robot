@@ -379,7 +379,21 @@
                 targetShoulder = 0;
                 targetElbow = 0;
                 
-                // Detectar colisión continuamente
+                if (timeInPhase > 2000) {
+                    animationPhase = 2;
+                    phaseStartTime = now;
+                    sequenceInitialized = false;
+                    console.log('🔄 FASE 2: Posicionarse para recibir la caja');
+                }
+            }
+            
+            // FASE 2: Posicionarse y detectar caja, luego secuencia de movimientos
+            else if (animationPhase === 2) {
+                targetBase = 130;
+                targetShoulder = 0;
+                targetElbow = 0;
+                
+                // Detectar colisión en fase 2 cuando el robot está posicionado
                 if (!pieceInGripper) {
                     for (let p of pieces) {
                         if (p.state === 'onConveyor') {
@@ -401,33 +415,6 @@
                         }
                     }
                 }
-                
-                // Hacer que la caja siga al gripper mientras se acerca
-                if (pieceInGripper && pieceInGripper.state === 'picked' && gripperBase && gripperBase.getWorldPosition) {
-                    const gripperPos = new THREE.Vector3();
-                    gripperBase.getWorldPosition(gripperPos);
-                    pieceInGripper.mesh.position.copy(gripperPos);
-                    pieceInGripper.mesh.position.y -= 1.2;
-                }
-                
-                if (timeInPhase > 2000) {
-                    if (pieceInGripper) {
-                        console.log('✅ Caja confirmada en gripper, pasando a fase 2');
-                    } else {
-                        console.log('⚠️ No se agarró ninguna caja, pero pasando a fase 2');
-                    }
-                    animationPhase = 2;
-                    phaseStartTime = now;
-                    sequenceInitialized = false;
-                    console.log('🔄 FASE 2: Iniciar secuencia de movimientos');
-                }
-            }
-            
-            // FASE 2: Secuencia de movimientos
-            else if (animationPhase === 2) {
-                targetBase = 130;
-                targetShoulder = 0;
-                targetElbow = 0;
                 
                 // Inicializar secuencia
                 if (!sequenceInitialized && pieceInGripper) {
