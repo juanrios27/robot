@@ -97,7 +97,7 @@
         const ROBOT_CONFIG = {
             url: 'https://raw.githubusercontent.com/juanrios27/robot/main/Ensamble_Completo_de_dise%C3%B1o.glb',
             scale: 10,             // Escala del modelo (ajustar según necesidad)
-            position: { x: 0, y: 0, z: 0 },
+            position: { x: 0, y: 0, z: 10 },
             rotation: { x: -90, y: 0, z: 0 }
         };
         
@@ -373,14 +373,14 @@
                     }
                     break;
                 case 1: // Aproximarse
-                    targetBase = -75;
+                    targetBase = 0;
                     targetShoulder = 0;
                     targetElbow = 0;
                     break;
                 case 2: // Recoger
                     targetBase = -75;
-                    targetShoulder = 70;
-                    targetElbow = 110;
+                    targetShoulder = 0;
+                    targetElbow = 0;
                     if (pieceInGripper && !pieceInGripper.pickedUp) {
                         pieceInGripper.state = 'picked';
                         pieceInGripper.pickedUp = true;
