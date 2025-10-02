@@ -270,7 +270,7 @@
         
         // SECUENCIA DE MOVIMIENTOS PREDEFINIDOS
         const movementSequence = [
-            { x: -50, y: 2, z: 0, duration: 800 },   // Punto 1
+            { x: -5, y: 2, z: 0, duration: 800 },   // Punto 1
             { x: 0, y: 4, z: 2, duration: 1000 },   // Punto 2
             { x: 5, y: 3, z: 0, duration: 800 },    // Punto 3
             { x: 8, y: 2, z: -1, duration: 1000 }   // Punto 4 (destino final)
@@ -421,35 +421,6 @@
                     targetBase = 130;
                     targetShoulder = 0;
                     targetElbow = 0;
-                    
-                    // Ejecutar secuencia de movimientos
-                    if (pieceInGripper && pieceInGripper.state === 'picked') {
-                        const timeInMovement = now - movementStartTime;
-                        const currentMove = movementSequence[currentMovementIndex];
-                        
-                        if (currentMove) {
-                            const progress = Math.min(timeInMovement / currentMove.duration, 1);
-                            const easeProgress = progress < 0.5 
-                                ? 2 * progress * progress 
-                                : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-                            
-                            pieceInGripper.mesh.position.x = movementStartPos.x + (currentMove.x - movementStartPos.x) * easeProgress;
-                            pieceInGripper.mesh.position.y = movementStartPos.y + (currentMove.y - movementStartPos.y) * easeProgress;
-                            pieceInGripper.mesh.position.z = movementStartPos.z + (currentMove.z - movementStartPos.z) * easeProgress;
-                            
-                            if (progress >= 1) {
-                                currentMovementIndex++;
-                                if (currentMovementIndex < movementSequence.length) {
-                                    movementStartTime = now;
-                                    movementStartPos = {
-                                        x: pieceInGripper.mesh.position.x,
-                                        y: pieceInGripper.mesh.position.y,
-                                        z: pieceInGripper.mesh.position.z
-                                    };
-                                }
-                            }
-                        }
-                    }
                     break;
                     
                 case 3: // Quedarse quieta 1 segundo y desaparecer
@@ -484,6 +455,52 @@
             }
             if (link2Group && link2Group.rotation) {
                 link2Group.rotation.z = THREE.MathUtils.degToRad(elbowAngle);
+            }
+            
+            // MOVIMIENTO DE LA CAJA según la fase
+            if (pieceInGripper && pieceInGripper.state === 'picked') {
+                if (animationPhase === 2) {
+                    // Fase 2: Ejecutar secuencia de movimientos predefinidos
+                    const timeInMovement = now - movementStartTime;
+                    const currentMove = movementSequence[currentMovementIndex];
+                    
+                    if (currentMove) {
+                        const progress = Math.min(timeInMovement / currentMove.duration, 1);
+                        const easeProgress = progress < 0.5 
+                            ? 2 * progress * progress 
+                            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                        
+                        pieceInGripper.mesh.position.x = movementStartPos.x + (currentMove.x - movementStartPos.x) * easeProgress;
+                        pieceInGripper.mesh.position.y = movementStartPos.y + (currentMove.y - movementStartPos.y) * easeProgress;
+                        pieceInGripper.mesh.position.z = movementStartPos.z + (currentMove.z - movementStartPos.z) * easeProgress;
+                        pieceInGripper.mesh.rotation.y += 0.02;
+                        
+                        console.log(`Movimiento ${currentMovementIndex + 1}: ${(progress * 100).toFixed(1)}%`);
+                        
+                        if (progress >= 1) {
+                            currentMovementIndex++;
+                            if (currentMovementIndex < movementSequence.length) {
+                                movementStartTime = now;
+                                movementStartPos = {
+                                    x: pieceInGripper.mesh.position.x,
+                                    y: pieceInGripper.mesh.position.y,
+                                    z: pieceInGripper.mesh.position.z
+                                };
+                                console.log(`✅ Completado punto ${currentMovementIndex}, siguiente: ${currentMovementIndex + 1}`);
+                            } else {
+                                console.log('✅ Secuencia completa!');
+                            }
+                        }
+                    }
+                } else if (animationPhase === 1 && gripperBase && gripperBase.getWorldPosition) {
+                    // Fase 1: Seguir al gripper mientras se recoge
+                    const gripperPos = new THREE.Vector3();
+                    gripperBase.getWorldPosition(gripperPos);
+                    pieceInGripper.mesh.position.copy(gripperPos);
+                    pieceInGripper.mesh.position.y -= 1.2;
+                    pieceInGripper.mesh.rotation.y += 0.02;
+                }
+                // Fase 3: No hacer nada, la caja se queda quieta
             }
             
             // Limpiar piezas que salen de la escena (solo las que están en la banda)
