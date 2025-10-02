@@ -271,10 +271,15 @@
         // SECUENCIA DE MOVIMIENTOS PREDEFINIDOS
         const movementSequence = [
             { x: -4, y: 1, z:0 , duration: 1000, baseAngle: 130, shoulderAngle: 0, elbowAngle: 0 },
-            { x: -3, y: 1, z: -2.65, duration: 1200, baseAngle: 90, shoulderAngle: 0, elbowAngle: 0 },
-            { x: -2, y: 1, z: -3.46, duration: 1000, baseAngle: 45, shoulderAngle: 0, elbowAngle: 0 },
-            { x: -1, y: 1, z: -3.87, duration: 1200, baseAngle: 0, shoulderAngle: 0, elbowAngle: 0 },
-            { x: 0, y: 1, z: -4, duration: 1200, baseAngle: 25, shoulderAngle: 0, elbowAngle: 0 }
+            { x: -3, y: 1, z: -2.65, duration: 1000, baseAngle: 107.5, shoulderAngle: 0, elbowAngle: 0 },
+            { x: -2, y: 1, z: -3.46, duration: 1000, baseAngle: 85, shoulderAngle: 0, elbowAngle: 0 },
+            { x: -1, y: 1, z: -3.87, duration: 1200, baseAngle: 62.5, shoulderAngle: 0, elbowAngle: 0 },
+            { x: 0, y: 1, z: -4, duration: 1200, baseAngle: 40, shoulderAngle: 0, elbowAngle: 0 },
+            { x: 1, y: 1, z:-3.87 , duration: 1000, baseAngle: 17.5, shoulderAngle: 0, elbowAngle: 0 },
+            { x: 2, y: 1, z: -3.46, duration: 1000, baseAngle: -5, shoulderAngle: 0, elbowAngle: 0 },
+            { x: 3, y: 1, z: -2.65, duration: 1000, baseAngle: -27.5, shoulderAngle: 0, elbowAngle: 0 },
+            { x: 4, y: 1, z: 0, duration: 1200, baseAngle: -50, shoulderAngle: 0, elbowAngle: 0 }
+            
         ];
         
         // Variables de animación
@@ -376,7 +381,7 @@
             
             // FASE 1: Aproximarse y agarrar
             else if (animationPhase === 1) {
-                targetBase = -55;
+                targetBase = -50;
                 targetShoulder = 0;
                 targetElbow = 0;
                 
