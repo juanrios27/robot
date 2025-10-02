@@ -35,7 +35,7 @@
         scene.fog = new THREE.Fog(0x0a0a0a, 30, 100);
         
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(-15, 10, 15);
+        camera.position.set(15, 10, 15);
         camera.lookAt(0, 3, 0);
         
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -270,10 +270,11 @@
         
         // SECUENCIA DE MOVIMIENTOS PREDEFINIDOS
         const movementSequence = [
-            { x: -5, y: 1, z: -1, duration: 1000 },
-            { x: 0, y: 4, z: 2, duration: 1200 },
-            { x: 0, y: 1, z: -4, duration: 1000 },
-            { x: 8, y: 2, z: -1, duration: 1200 }
+            { x: -4, y: 1, z:0 , duration: 1000, baseAngle: 130, shoulderAngle: 0, elbowAngle: 0 },
+            { x: -3, y: 1, z: -2.65, duration: 1200, baseAngle: 90, shoulderAngle: 0, elbowAngle: 0 },
+            { x: -2, y: 1, z: -3.46, duration: 1000, baseAngle: 45, shoulderAngle: 0, elbowAngle: 0 },
+            { x: -1, y: 1, z: -3.87, duration: 1200, baseAngle: 0, shoulderAngle: 0, elbowAngle: 0 },
+            { x: 0, y: 1, z: -4, duration: 1200, baseAngle: 25, shoulderAngle: 0, elbowAngle: 0 }
         ];
         
         // Variables de animación
@@ -451,16 +452,12 @@
                         pieceInGripper.mesh.position.set(newX, newY, newZ);
                         pieceInGripper.mesh.rotation.y += 0.02;
                         
-                        // MOVER EL BRAZO PARA QUE SIGA A LA CAJA
-                        // Calcular ángulo base según posición X y Z de la caja
-                        const angleToBox = -Math.atan2(newX, newZ) * (180 / Math.PI);
-                        targetBase = angleToBox;
+                        // DEFINIR ÁNGULOS DEL BRAZO según el movimiento actual
+                        targetBase = currentMove.baseAngle;
+                        targetShoulder = currentMove.shoulderAngle;
+                        targetElbow = currentMove.elbowAngle;
                         
-                        // Calcular altura del hombro según Y de la caja
-                        const heightFactor = (newY - 2) * 15; // Ajustar según altura
-                        targetShoulder = Math.max(-45, Math.min(45, heightFactor));
-                        
-                        console.log(`📍 Punto ${currentMovementIndex + 1}/4 - Progreso: ${(progress * 100).toFixed(0)}% - Pos: (${newX.toFixed(1)}, ${newY.toFixed(1)}, ${newZ.toFixed(1)}) - Ángulos: Base=${targetBase.toFixed(1)}° Hombro=${targetShoulder.toFixed(1)}°`);
+                        console.log(`📍 Punto ${currentMovementIndex + 1}/4 - ${(progress * 100).toFixed(0)}% - Pos: (${newX.toFixed(1)}, ${newY.toFixed(1)}, ${newZ.toFixed(1)}) - Ángulos: Base=${targetBase}° Hombro=${targetShoulder}° Codo=${targetElbow}°`);
                         
                         // Pasar al siguiente punto
                         if (progress >= 1) {
