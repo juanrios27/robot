@@ -336,7 +336,7 @@
             // Mover piezas en banda SOLO si no están siendo agarradas
             pieces.forEach(p => {
                 if (p.state === 'onConveyor') {
-                    p.mesh.position.x += 0.035;
+                    p.mesh.position.x += 0.05;
                     p.mesh.rotation.y += 0.02;
                 } else if (p.state === 'released') {
                     // Las liberadas se mueven un poco
