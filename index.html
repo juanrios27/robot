@@ -236,7 +236,7 @@
                     const model = gltf.scene.clone(true);
                     
                     model.scale.set(ROBOT_CONFIG.scale, ROBOT_CONFIG.scale, ROBOT_CONFIG.scale);
-                    model.position.set(0, 0, 0); // Posición relativa al grupo
+                    model.position.set(0, 0, 0);
                     model.rotation.set(
                         THREE.MathUtils.degToRad(ROBOT_CONFIG.rotation.x),
                         THREE.MathUtils.degToRad(ROBOT_CONFIG.rotation.y),
@@ -251,12 +251,9 @@
                     });
                     
                     robotGroup.add(model);
-                    
-                    // Posicionar el GRUPO en el mundo
                     robotGroup.position.set(0, 0, zOffset);
                     scene.add(robotGroup);
                     
-                    // Guardar referencias INDEPENDIENTES para este robot
                     robotData.group = robotGroup;
                     robotData.model = model;
                     robotData.baseRotation = model.getObjectByName('Base') || model;
@@ -280,13 +277,9 @@
         const pieces = [[], [], []];
         
         productionLines.forEach((line, index) => {
-            // Crear banda
             conveyors.push(createConveyor(line.zOffset));
-            
-            // Crear estación de inspección
             inspectionStations.push(createInspectionStation(line.zOffset, line.color));
             
-            // Inicializar robot con variables COMPLETAMENTE INDEPENDIENTES
             const robotData = {
                 id: index,
                 zOffset: line.zOffset,
@@ -296,17 +289,15 @@
                 link1Group: null,
                 link2Group: null,
                 loaded: false,
-                // Variables de animación PROPIAS
                 baseAngle: 0,
                 shoulderAngle: 0,
                 elbowAngle: 0,
                 targetBaseAngle: 0,
                 targetShoulderAngle: 0,
                 targetElbowAngle: 0,
-                // Variables de control PROPIAS
                 pieceInGripper: null,
                 animationPhase: 0,
-                phaseStartTime: Date.now() + (index * 500), // Desfase inicial
+                phaseStartTime: Date.now() + (index * 500),
                 currentMovementIndex: 0,
                 movementStartTime: 0,
                 movementStartPos: { x: 0, y: 0, z: 0 },
@@ -316,12 +307,10 @@
             };
             
             robots.push(robotData);
-            
-            // Cargar modelo GLB de forma independiente
             loadRobotGLB(line.zOffset, index, robotData);
         });
         
-        // SECUENCIA DE MOVIMIENTOS (se ajusta para cada línea con su Z)
+        // SECUENCIA DE MOVIMIENTOS
         const movementSequence = [
             { x: -4, y: 1, z: 0, duration: 1000, baseAngle: 0, shoulderAngle: 130, elbowAngle: 130 },
             { x: -3, y: 1, z: -2.65, duration: 1000, baseAngle: 0, shoulderAngle: 130, elbowAngle: 93 },
@@ -367,32 +356,58 @@
             return current + diff * speed;
         }
         
-        // Control táctil
-        let touchStartX = 0, touchStartY = 0;
+        // Control de orientación del dispositivo (giroscopio)
         let cameraRotationY = Math.PI / 4, cameraRotationX = 0;
+        let useGyroscope = false;
+        let initialAlpha = null;
+        let initialBeta = null;
         
-        renderer.domElement.addEventListener('touchstart', (e) => {
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
-        });
+        function handleOrientation(event) {
+            const alpha = event.alpha;
+            const beta = event.beta;
+            const gamma = event.gamma;
+            
+            if (alpha !== null && beta !== null && gamma !== null) {
+                useGyroscope = true;
+                
+                if (initialAlpha === null) {
+                    initialAlpha = alpha;
+                    initialBeta = beta;
+                }
+                
+                let deltaAlpha = (alpha - initialAlpha) * Math.PI / 180;
+                let deltaBeta = (beta - initialBeta) * Math.PI / 180;
+                
+                cameraRotationY = Math.PI / 4 - deltaAlpha * 2;
+                cameraRotationX = -deltaBeta * 1.5;
+                
+                cameraRotationX = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, cameraRotationX));
+            }
+        }
         
-        renderer.domElement.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            const deltaX = e.touches[0].clientX - touchStartX;
-            const deltaY = e.touches[0].clientY - touchStartY;
-            
-            cameraRotationY += deltaX * 0.005;
-            cameraRotationX += deltaY * 0.005;
-            
-            cameraRotationX = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, cameraRotationX));
-            
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
-        });
+        // Activar giroscopio automáticamente
+        if (typeof DeviceOrientationEvent !== 'undefined') {
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                // iOS 13+ requiere permiso
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation);
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                // Android y otros dispositivos
+                window.addEventListener('deviceorientation', handleOrientation);
+            }
+        }
         
-        // Control de mouse
+        // Control de mouse para desktop
         let mouseDown = false;
+        let touchStartX = 0, touchStartY = 0;
+        
         renderer.domElement.addEventListener('mousedown', (e) => {
+            if (useGyroscope) return;
             mouseDown = true;
             touchStartX = e.clientX;
             touchStartY = e.clientY;
@@ -403,7 +418,7 @@
         });
         
         renderer.domElement.addEventListener('mousemove', (e) => {
-            if (!mouseDown) return;
+            if (!mouseDown || useGyroscope) return;
             
             const deltaX = e.clientX - touchStartX;
             const deltaY = e.clientY - touchStartY;
@@ -422,20 +437,17 @@
             
             const now = Date.now();
             
-            // PROCESAR CADA LÍNEA DE PRODUCCIÓN DE FORMA COMPLETAMENTE INDEPENDIENTE
             robots.forEach((robot, lineId) => {
                 if (!robot.loaded) return;
                 
                 const line = productionLines[lineId];
                 const linePieces = pieces[lineId];
                 
-                // Crear pieza si está permitido y no hay ninguna
                 if (robot.canCreatePiece && linePieces.length === 0) {
                     createPiece(lineId);
                     robot.canCreatePiece = false;
                 }
                 
-                // Mover piezas en banda
                 linePieces.forEach(p => {
                     if (p.state === 'onConveyor') {
                         p.mesh.position.x += 0.035;
@@ -445,7 +457,6 @@
                 
                 const timeInPhase = now - robot.phaseStartTime;
                 
-                // FASE 0: Posición inicial
                 if (robot.animationPhase === 0) {
                     robot.targetBaseAngle = 0;
                     robot.targetShoulderAngle = 0;
@@ -457,7 +468,6 @@
                     }
                 }
                 
-                // FASE 1: Aproximarse
                 else if (robot.animationPhase === 1) {
                     robot.targetBaseAngle = 0;
                     robot.targetShoulderAngle = 130;
@@ -470,13 +480,11 @@
                     }
                 }
                 
-                // FASE 2: Agarrar y mover
                 else if (robot.animationPhase === 2) {
                     robot.targetBaseAngle = 0;
                     robot.targetShoulderAngle = 130;
                     robot.targetElbowAngle = 130;
                     
-                    // Detectar colisión
                     if (!robot.pieceInGripper) {
                         for (let p of linePieces) {
                             if (p.state === 'onConveyor') {
@@ -494,7 +502,6 @@
                         }
                     }
                     
-                    // Inicializar secuencia
                     if (!robot.sequenceInitialized && robot.pieceInGripper) {
                         robot.currentMovementIndex = 0;
                         robot.movementStartTime = now;
@@ -506,7 +513,6 @@
                         robot.sequenceInitialized = true;
                     }
                     
-                    // Ejecutar movimientos
                     if (robot.pieceInGripper && robot.sequenceInitialized && robot.pieceInGripper.state === 'picked') {
                         const timeInMovement = now - robot.movementStartTime;
                         const currentMove = movementSequence[robot.currentMovementIndex];
@@ -547,7 +553,6 @@
                     }
                 }
                 
-                // FASE 3: Desaparecer y reiniciar
                 else if (robot.animationPhase === 3) {
                     robot.targetBaseAngle = 0;
                     robot.targetShoulderAngle = 130;
@@ -565,12 +570,10 @@
                     }
                 }
                 
-                // Aplicar movimiento suave usando las variables PROPIAS del robot
                 robot.baseAngle = smoothAngle(robot.baseAngle, robot.targetBaseAngle, 0.09);
                 robot.shoulderAngle = smoothAngle(robot.shoulderAngle, robot.targetShoulderAngle, 0.09);
                 robot.elbowAngle = smoothAngle(robot.elbowAngle, robot.targetElbowAngle, 0.09);
                 
-                // Aplicar rotaciones a las partes específicas de ESTE robot
                 if (robot.baseRotation && robot.baseRotation.rotation) {
                     robot.baseRotation.rotation.y = THREE.MathUtils.degToRad(robot.baseAngle);
                 }
@@ -581,7 +584,6 @@
                     robot.link2Group.rotation.z = THREE.MathUtils.degToRad(robot.elbowAngle);
                 }
                 
-                // Limpiar piezas que salen de la escena
                 for (let i = linePieces.length - 1; i >= 0; i--) {
                     if (linePieces[i].mesh.position.x > 20 && linePieces[i].state === 'onConveyor') {
                         scene.remove(linePieces[i].mesh);
@@ -590,14 +592,12 @@
                 }
             });
             
-            // Animación de luces
             inspectionStations.forEach(station => {
                 station.indicators.forEach((ind, i) => {
                     ind.material.emissiveIntensity = 0.5 + Math.sin(now * 0.003 + i) * 0.4;
                 });
             });
             
-            // Actualizar cámara
             const radius = 28;
             const height = 18;
             
